@@ -109,7 +109,7 @@ cp .env.example .env
 
 ```env
 GEMINI_API_KEY=مفتاحك_هنا
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.6-flash
 PDF_FILENAME=source.pdf
 SOURCE_LABEL=NICE Migraine Guideline (CG150)
 TOP_K=5
