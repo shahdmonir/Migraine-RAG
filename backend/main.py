@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import json
+import re
 
 import config
 import database
@@ -10,21 +11,29 @@ import rag_engine
 
 app = FastAPI(title="Migraine RAG API")
 
-# CORS - مفتوح في وضع التطوير عشان الفرونت اند (على بورت تاني) يقدر يكلم الباك اند
+# CORS - بيسمح بأي origin وقت التطوير، وبس الـ frontend المحدد وقت النشر
+allowed_origins = ["*"] if config.FRONTEND_ORIGIN == "*" else [config.FRONTEND_ORIGIN]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# بيسمح للفرونت إند إنه يفتح ملف الـ PDF مباشرة عبر: http://localhost:8000/files/source.pdf
+# بيسمح للفرونت إند إنه يفتح ملف الـ PDF مباشرة عبر: /files/source.pdf
 app.mount("/files", StaticFiles(directory=str(config.DATA_DIR)), name="files")
 
 
 @app.on_event("startup")
 def on_startup():
     database.init_db()
+
+    # لو قاعدة بيانات المتجهات مش موجودة (زي وقت النشر الأول على استضافة جديدة)، نبنيها تلقائياً
+    if not config.CHROMA_DIR.exists():
+        print("chroma_db مش موجودة، جاري بناؤها تلقائياً...")
+        import ingest
+        ingest.main()
+        print("خلصنا بناء chroma_db بنجاح.")
 
 
 class QuestionRequest(BaseModel):
@@ -115,8 +124,6 @@ def query(payload: QuestionRequest):
         title = question[:50]
         conversation_id = database.create_conversation(title)
 
-    # بنسجل رسالة اليوزر ورسالة placeholder للـ assistant الأول، عشان ناخد الـ message_id
-    # ونقدر نربط بيه سجل الاسترجاع (retrieval log) من جوه answer_question
     database.add_message(conversation_id, "user", question)
     assistant_message_id = database.add_message(conversation_id, "assistant", question, None)
 
@@ -125,7 +132,6 @@ def query(payload: QuestionRequest):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # دلوقتي نحدّث رسالة الـ assistant بالنتيجة الحقيقية بدل الـ placeholder
     database.update_message_result(assistant_message_id, json.dumps(result, ensure_ascii=False))
 
     result["conversation_id"] = conversation_id

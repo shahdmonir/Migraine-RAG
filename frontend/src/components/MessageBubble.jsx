@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { FileText, ListTree } from "lucide-react";
+import { FileText, ListTree, Copy, RotateCw, Check, Pencil, X, ArrowUp } from "lucide-react";
 import { useApp } from "../AppContext.jsx";
 import { getMessageRetrievals } from "../api.js";
 
@@ -27,10 +27,85 @@ function TypedText({ text, className, skipAnimation }) {
   return <p className={className}>{shown}</p>;
 }
 
-export function UserBubble({ text }) {
+export function UserBubble({ text, onRetry, onEdit }) {
+  const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(text);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      // فشل النسخ، مش هنعمل حاجة
+    }
+  };
+
+  const startEdit = () => {
+    setEditText(text);
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const submitEdit = () => {
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === text) {
+      setIsEditing(false);
+      return;
+    }
+    setIsEditing(false);
+    onEdit(trimmed);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="msg-row user">
+        <div className="bubble-user bubble-editing">
+          <textarea
+            className="edit-textarea"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitEdit();
+              }
+              if (e.key === "Escape") cancelEdit();
+            }}
+            autoFocus
+            rows={2}
+          />
+          <div className="edit-actions">
+            <button className="icon-action" onClick={cancelEdit} aria-label="إلغاء">
+              <X size={14} />
+            </button>
+            <button className="icon-action edit-submit" onClick={submitEdit} aria-label="إرسال">
+              <ArrowUp size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="msg-row user">
       <div className="bubble-user">{text}</div>
+      <div className="user-actions">
+        <button className="icon-action" onClick={handleCopy} aria-label="نسخ">
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+        </button>
+        <button className="icon-action" onClick={onRetry} aria-label="إعادة المحاولة">
+          <RotateCw size={14} />
+        </button>
+        <button className="icon-action" onClick={startEdit} aria-label="تعديل">
+          <Pencil size={14} />
+        </button>
+      </div>
     </div>
   );
 }

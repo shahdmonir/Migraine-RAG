@@ -37,11 +37,19 @@ export default function ChatWindow({ conversationId, onConversationCreated }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const send = async (question) => {
+  const send = async (question, replaceFromIndex = null) => {
     const q = question.trim();
     if (!q || loading) return;
 
-    setMessages((prev) => [...prev, { role: "user", text: q }]);
+    if (replaceFromIndex === null) {
+      setMessages((prev) => [...prev, { role: "user", text: q }]);
+    } else {
+      // بنشيل من السؤال ده لآخر المحادثة (سواء كان retry بنفس النص، أو edit بنص جديد)
+      setMessages((prev) => [
+        ...prev.slice(0, replaceFromIndex),
+        { role: "user", text: q },
+      ]);
+    }
     setInput("");
     setLoading(true);
 
@@ -64,12 +72,21 @@ export default function ChatWindow({ conversationId, onConversationCreated }) {
             has_answer: false,
             answer: t.connectionError,
             confidence: "Low",
+            isError: true,
           },
         },
       ]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const retryQuestion = (idx, questionText) => {
+    send(questionText, idx);
+  };
+
+  const editQuestion = (idx, newText) => {
+    send(newText, idx);
   };
 
   return (
@@ -103,7 +120,12 @@ export default function ChatWindow({ conversationId, onConversationCreated }) {
       <div className="messages">
         {messages.map((m, idx) =>
           m.role === "user" ? (
-            <UserBubble key={idx} text={m.text} />
+            <UserBubble
+              key={idx}
+              text={m.text}
+              onRetry={() => retryQuestion(idx, m.text)}
+              onEdit={(newText) => editQuestion(idx, newText)}
+            />
           ) : (
             <AnswerBubble
               key={idx}
